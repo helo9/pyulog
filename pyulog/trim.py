@@ -1,11 +1,12 @@
 """ Module with trimming functionality for ULog file"""
 
+import struct
 from .core import ULog
 
 __author__ = "Jonathan Hahn"
 
 
-class ULogTrim(ULog):
+class _ULogTrim(ULog):
 
     MAX_READ_BUFFER_SIZE = 512
 
@@ -39,14 +40,18 @@ class ULogTrim(ULog):
 
         ULog._disable_str_exceptions = True
 
-    def trim(self, log_file, start_timestamp, end_timestamp):
+    def trim(self, ulog_in, ulog_out, start_timestamp, end_timestamp):
         """ create trimmed copy of ULog file """
 
-        if isinstance(log_file, str):
-            with open(log_file, 'rb') as log:
+        self._outfile_name = ulog_out
+
+        if isinstance(ulog_in, str):
+            with open(ulog_in, 'rb') as log:
                 self._file_handle = log
                 self._trim(start_timestamp, end_timestamp)
         else:
+            # assuming file
+            self._file_handle = ulog_in
             self._trim(start_timestamp, end_timestamp)
 
 
@@ -54,8 +59,8 @@ class ULogTrim(ULog):
         self._read_file_header()
         self._read_file_definitions()
 
-        with open('outfile.ulog', 'wb') as self._outfile:
-            self._copy_binary(start=0, end=self._file_handle.tell())
+        with open(self._outfile_name, 'wb') as self._outfile:
+            self._copy_header(start=0, end=self._file_handle.tell(), start_ts=start_timestamp)
 
             header = self._MessageHeader()
             msg_data = self._MessageData()
@@ -88,28 +93,29 @@ class ULogTrim(ULog):
                     elif msg_data.timestamp / 1e6 > end_timestamp:
                         break
 
-
-
                 self._outfile.write(header_data)
                 self._outfile.write(data)
-                print('worte something')
 
-    def _copy_binary(self, start, end):
+    def _copy_header(self, start, end, start_ts):
         reader_pos = self._file_handle.tell()
 
-        while start != end:
-            bytes_to_read = min(end-start, self.MAX_READ_BUFFER_SIZE)
+        bytes_to_read = end-start
 
-            self._file_handle.seek(start)
-            
-            self._outfile.write(self._file_handle.read(bytes_to_read))
-            
-            start += bytes_to_read
+        self._file_handle.seek(start)
+
+        buffer = self._file_handle.read(bytes_to_read)
+
+        buffer = buffer[:8] + struct.pack("<Q", start_ts*1000000) + buffer[16:]
+        
+        self._outfile.write(buffer)
 
         self._file_handle.seek(reader_pos)
 
 
-def main():
-    ulg = ULogTrim()
+def trim(ulog_in, ulog_out, start, end):
+    ulg = _ULogTrim()
+    ulg.trim(ulog_in, ulog_out, start, end)
 
-    ulg.trim('test/test.ulg', 590, 600)
+
+def main():
+    trim('test/test.ulg', 'test/output.ulg', 0, 10000000)
