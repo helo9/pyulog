@@ -118,4 +118,22 @@ def trim(ulog_in, ulog_out, start, end):
 
 
 def main():
-    trim('test/test.ulg', 'test/output.ulg', 0, 10000000)
+    """Command line interface"""
+
+    def positive_float(val):
+        val = float(val)
+
+        if val < 0:
+            raise ValueError("Only positive values allowed!")
+
+        return val
+
+    parser = argparse.ArgumentParser(description="Trim ULog files with timestamps")
+    parser.add_argument('infile', metavar='in.ulg', help='ULog input file')
+    parser.add_argument('outfile', metvar='out.ulg', help='Trimmed ULog file (to be created)')
+    parser.add_argument('start', type=positive_float, help='start timestamp in seconds (since bootup)')
+    parser.add_argument('end', type=positive_float, help='end timestamp in seconds (since bootup)')
+
+    args = parser.parse_args()
+
+    trim(args.infile, args.outfile, args.start, args.end)
